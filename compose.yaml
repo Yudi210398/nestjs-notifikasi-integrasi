@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env.docker}
+      MYSQL_DATABASE: ${DB_NAME:?Set DB_NAME in .env}
+      DB_USER: ${DB_USER:?Set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init-readonly.sh:/docker-entrypoint-initdb.d/01-readonly.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
