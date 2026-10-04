@@ -19,14 +19,23 @@ The database files live in the Docker named volume `mysql_data`, outside the rep
 
 ## 3. Import the real legacy dump
 
-Keep the dump outside this repository. Replace the example Windows path with the actual path to your `.sql` file:
+Keep the dump outside this repository. Inspect it for `CREATE DATABASE`, `USE`, or qualified table names before importing so it cannot select another database. The inspected `php-native-lords.sql` dump has none of those target switches. Replace the example Windows path with its actual path:
 
 ```sh
-docker compose --env-file .env --env-file .env.docker cp "C:\path\to\legacy.sql" mysql:/tmp/legacy.sql
-docker compose --env-file .env --env-file .env.docker exec -T mysql sh -c 'mysql --user=root --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < /tmp/legacy.sql'
+docker compose --env-file .env --env-file .env.docker cp "C:\path\to\php-native-lords.sql" mysql:/tmp/php-native-lords.sql
+docker compose --env-file .env --env-file .env.docker exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --user=root --database="$MYSQL_DATABASE" --init-command="SET SESSION innodb_strict_mode=OFF" --binary-mode=1 < /tmp/php-native-lords.sql'
 ```
 
-Check whether the dump contains its own `CREATE DATABASE` or `USE` statements before importing; it should populate the local `DB_NAME`. A compressed dump must be decompressed first. Do not use the read-only app user for import.
+The `php-native-lords.sql` dump needs `innodb_strict_mode=OFF` during import into MySQL 8 because the legacy `tbl_ukuran` definition triggers error 1118 (row size check). The command changes the setting only for the import connection. Do not change the server-wide setting or edit the source dump. A compressed dump must be decompressed first. Do not use the read-only app user for import.
+
+If an import already failed partway through, start again with a fresh **local** volume only after confirming it contains no data to preserve, then rerun the two import commands above:
+
+```sh
+docker compose --env-file .env --env-file .env.docker down -v
+docker compose --env-file .env --env-file .env.docker up -d mysql
+```
+
+Check that the import exits successfully before running Prisma commands. The app's `legacy_reader` account remains SELECT-only.
 
 ## 4. Introspect and generate the client
 

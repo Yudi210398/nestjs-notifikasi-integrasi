@@ -6,3 +6,559 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
+model email_set {
+  id       Int    @id @default(autoincrement())
+  email    String @db.VarChar(255)
+  password String @db.VarChar(255)
+}
+
+model gambar_baju {
+  baju_id   Int    @id @default(autoincrement())
+  custom_id Int
+  bawah     Int?
+  img       String @db.VarChar(255)
+}
+
+model order_accents {
+  order_accents_id  Int    @id @default(autoincrement())
+  order_id          Int
+  pelanggan_id      Int
+  order_accents_ket String @db.Text
+}
+
+model tbl_bahan {
+  bahan_id     Int           @id @default(autoincrement())
+  category_id  Int?
+  nama         String        @db.VarChar(255)
+  keterangan   String?       @db.Text
+  image        String?       @db.VarChar(255)
+  tbl_category tbl_category? @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_bahan_ibfk_1")
+
+  @@index([category_id], map: "category_id")
+}
+
+model tbl_category {
+  category_id   Int         @id @default(autoincrement())
+  category_nama String      @db.VarChar(255)
+  category_ket  String?     @db.VarChar(255)
+  kd_kwt        String      @db.VarChar(255)
+  tbl_bahan     tbl_bahan[]
+}
+
+model tbl_custom {
+  custom_id       Int     @id @default(autoincrement())
+  sub_category_id Int
+  id_type         Int
+  custom_nama     String  @db.VarChar(255)
+  custom_ket      String? @db.VarChar(255)
+  custom_img      String  @db.VarChar(255)
+}
+
+model tbl_detail_gambar {
+  id         Int        @id @default(autoincrement())
+  order_id   Int?
+  jenis      String?    @db.VarChar(255)
+  keterangan String?    @db.Text
+  gambar     String     @db.VarChar(255)
+  created_at DateTime?  @db.Timestamp(0)
+  updated_at DateTime?  @db.Timestamp(0)
+  tbl_order  tbl_order? @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_detail_gambar_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_fitting {
+  fitting_id     Int     @id @default(autoincrement())
+  order_id       Int
+  fitting_status String? @db.VarChar(255)
+}
+
+model tbl_gallery {
+  gallery_id      Int     @id @default(autoincrement())
+  category_id     Int?
+  sub_category_id Int
+  order_id        Int
+  pelanggan_id    Int?
+  no_kw           String? @db.VarChar(255)
+  gallery_ket     String? @db.VarChar(255)
+  gallery_img     String  @db.VarChar(255)
+}
+
+model tbl_order {
+  order_id            Int                   @id @default(autoincrement())
+  pelanggan_id        Int
+  model_id            Int?
+  no_kw               String?               @unique(map: "no_kw") @db.VarChar(255)
+  tgl_input           DateTime              @db.Date
+  tgl_coba            DateTime?             @db.Date
+  tgl_selesai         DateTime              @db.Date
+  category_id         Int
+  order_status        String                @db.VarChar(255)
+  order_ket           String?               @db.VarChar(255)
+  qty                 Int
+  keterangan1         String?               @db.Text
+  flui_celana         Int?
+  uk_jas              Int?
+  uk_ps               Int?
+  jeans               Int?
+  pengambil           String?               @db.VarChar(255)
+  tbl_detail_gambar   tbl_detail_gambar[]
+  tbl_uk_baju_order   tbl_uk_baju_order[]
+  tbl_uk_celana_order tbl_uk_celana_order[]
+  tbl_uk_jas_order    tbl_uk_jas_order[]
+  tbl_uk_ps_order     tbl_uk_ps_order[]
+  tbl_uk_rompi_order  tbl_uk_rompi_order[]
+  tbl_ukuran_order    tbl_ukuran_order[]
+}
+
+model tbl_order_custom {
+  order_custom_id  Int     @id @default(autoincrement())
+  order_id         Int
+  sub_category_id  Int
+  custom_id        Int
+  order_custom_ket String? @db.VarChar(255)
+}
+
+model tbl_pegawai {
+  pegawai_id    Int    @id @default(autoincrement())
+  pegawai_nama  String @db.VarChar(50)
+  pegawai_pass  String @db.VarChar(50)
+  pegawai_email String @db.VarChar(255)
+}
+
+model tbl_pelanggan {
+  pelanggan_id     Int      @id @default(autoincrement())
+  pelanggan_nama   String   @db.VarChar(255)
+  pelanggan_hp     String?  @db.VarChar(255)
+  pelanggan_alamat String?  @db.VarChar(255)
+  pelanggan_sales  String?  @db.VarChar(255)
+  tgl_daftar       DateTime @db.DateTime(0)
+}
+
+model tbl_sub_category {
+  sub_category_id   Int     @id @default(autoincrement())
+  id_type           Int
+  category_id       Int
+  sub_category_nama String  @db.VarChar(255)
+  sub_category_ket  String? @db.VarChar(255)
+}
+
+model tbl_type_custom {
+  id_type   Int     @id @default(autoincrement())
+  name_type String  @db.VarChar(255)
+  type_ket  String? @db.VarChar(255)
+}
+
+model tbl_uk_baju {
+  ukuran_id    Int     @id @default(autoincrement())
+  pelanggan_id Int
+  category_id  Int
+  p_badan      String? @db.VarChar(255)
+  pundak       String? @db.VarChar(255)
+  p_tangan     String? @db.VarChar(255)
+  l_ketiak     String? @db.VarChar(255)
+  l_atas       String? @db.VarChar(255)
+  l_tengah     String? @db.VarChar(255)
+  pundak1      String? @db.VarChar(255)
+  p_tangan1    String? @db.VarChar(255)
+  l_ketiak1    String? @db.VarChar(255)
+  l_u_tangan   String? @db.VarChar(255)
+  marset       String? @db.VarChar(255)
+  leher        String? @db.VarChar(255)
+  leher1       String? @db.VarChar(255)
+  dada_d       String? @db.VarChar(255)
+  dada_b       String? @db.VarChar(255)
+  d_atas       String? @db.VarChar(255)
+  d_belakang   String? @db.VarChar(255)
+  perut_d      String? @db.VarChar(255)
+  perut_b      String? @db.VarChar(255)
+  pinggul_d    String? @db.VarChar(255)
+  pinggul_b    String? @db.VarChar(255)
+  l_dada       String? @db.VarChar(255)
+  l_perut      String? @db.VarChar(255)
+  l_pinggul    String? @db.VarChar(255)
+}
+
+model tbl_uk_baju_order {
+  ukuran_id  Int       @id @default(autoincrement())
+  order_id   Int
+  p_badan    String?   @db.VarChar(255)
+  pundak     String?   @db.VarChar(255)
+  p_tangan   String?   @db.VarChar(255)
+  l_ketiak   String?   @db.VarChar(255)
+  l_atas     String?   @db.VarChar(255)
+  l_tengah   String?   @db.VarChar(255)
+  pundak1    String?   @db.VarChar(255)
+  p_tangan1  String?   @db.VarChar(255)
+  l_ketiak1  String?   @db.VarChar(255)
+  l_u_tangan String?   @db.VarChar(255)
+  marset     String?   @db.VarChar(255)
+  leher      String?   @db.VarChar(255)
+  leher1     String?   @db.VarChar(255)
+  dada_d     String?   @db.VarChar(255)
+  dada_b     String?   @db.VarChar(255)
+  d_atas     String?   @db.VarChar(255)
+  d_belakang String?   @db.VarChar(255)
+  perut_d    String?   @db.VarChar(255)
+  perut_b    String?   @db.VarChar(255)
+  pinggul_d  String?   @db.VarChar(255)
+  pinggul_b  String?   @db.VarChar(255)
+  l_dada     String?   @db.VarChar(255)
+  l_perut    String?   @db.VarChar(255)
+  l_pinggul  String?   @db.VarChar(255)
+  tbl_order  tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_uk_baju_order_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_uk_celana {
+  ukuran_id      Int     @id @default(autoincrement())
+  pelanggan_id   Int
+  flui           Int?
+  pinggang       String? @db.VarChar(255)
+  panjang        String? @db.VarChar(255)
+  paha           String? @db.VarChar(255)
+  lutut          String? @db.VarChar(255)
+  kaki           String? @db.VarChar(255)
+  kil            String? @db.VarChar(255)
+  pinggul_celana String? @db.VarChar(255)
+}
+
+model tbl_uk_celana_order {
+  ukuran_id      Int       @id @default(autoincrement())
+  order_id       Int
+  flui           Int?
+  pinggang       String?   @db.VarChar(255)
+  panjang        String?   @db.VarChar(255)
+  paha           String?   @db.VarChar(255)
+  lutut          String?   @db.VarChar(255)
+  kaki           String?   @db.VarChar(255)
+  kil            String?   @db.VarChar(255)
+  pinggul_celana String?   @db.VarChar(255)
+  tbl_order      tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_uk_celana_order_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_uk_jas {
+  ukuran_id        Int     @id @default(autoincrement())
+  pelanggan_id     Int
+  p_badan_d_das    String? @db.VarChar(255)
+  p_badan_b_das    String? @db.VarChar(255)
+  pundak_das       String? @db.VarChar(255)
+  leb_bahu_das     String? @db.VarChar(255)
+  p_tangan_das     String? @db.VarChar(255)
+  badan_d_das      String? @db.VarChar(255)
+  badan_b_das      String? @db.VarChar(255)
+  dada_das         String? @db.VarChar(255)
+  pinggang_das     String? @db.VarChar(255)
+  pinggul_das      String? @db.VarChar(255)
+  leher_das        String? @db.VarChar(255)
+  p_badan_d_jadi   String? @db.VarChar(255)
+  p_badan_b_jadi   String? @db.VarChar(255)
+  pundak_jadi      String? @db.VarChar(255)
+  leb_bahu_jadi    String? @db.VarChar(255)
+  p_tangan_jadi    String? @db.VarChar(255)
+  badan_d_jadi     String? @db.VarChar(255)
+  badan_b_jadi     String? @db.VarChar(255)
+  dada_jadi1       String? @db.VarChar(255)
+  dada_jadi2       String? @db.VarChar(255)
+  dada_jadi3       String? @db.VarChar(255)
+  dada_t           String? @db.VarChar(255)
+  pinggang_jadi1   String? @db.VarChar(255)
+  pinggang_jadi2   String? @db.VarChar(255)
+  pinggang_jadi3   String? @db.VarChar(255)
+  pinggang_t       String? @db.VarChar(255)
+  pinggul_jadi1    String? @db.VarChar(255)
+  pinggul_jadi2    String? @db.VarChar(255)
+  pinggul_jadi3    String? @db.VarChar(255)
+  pinggul_t        String? @db.VarChar(255)
+  leb_tangan1      String? @db.VarChar(255)
+  leb_tangan2      String? @db.VarChar(255)
+  leb_tangan3      String? @db.VarChar(255)
+  l_kerongan       String? @db.VarChar(255)
+  l_kerongan1      String? @db.VarChar(255)
+  d_breast         String? @db.VarChar(255)
+  d_breast1        String? @db.VarChar(255)
+  p_badan_d_jadi_2 String? @db.VarChar(255)
+  p_badan_b_jadi_2 String? @db.VarChar(255)
+  pundak_jadi_2    String? @db.VarChar(255)
+  leb_bahu_jadi_2  String? @db.VarChar(255)
+  p_tangan_jadi_2  String? @db.VarChar(255)
+  badan_d_jadi_2   String? @db.VarChar(255)
+  badan_b_jadi_2   String? @db.VarChar(255)
+  dada_jadi1_2     String? @db.VarChar(255)
+  dada_jadi2_2     String? @db.VarChar(255)
+  dada_jadi3_2     String? @db.VarChar(255)
+  dada_t_2         String? @db.VarChar(255)
+  pinggang_jadi1_2 String? @db.VarChar(255)
+  pinggang_jadi2_2 String? @db.VarChar(255)
+  pinggang_jadi3_2 String? @db.VarChar(255)
+  pinggang_t_2     String? @db.VarChar(255)
+  pinggul_jadi1_2  String? @db.VarChar(255)
+  pinggul_jadi2_2  String? @db.VarChar(255)
+  pinggul_jadi3_2  String? @db.VarChar(255)
+  pinggul_t_2      String? @db.VarChar(255)
+  leb_tangan1_2    String? @db.VarChar(255)
+  leb_tangan2_2    String? @db.VarChar(255)
+  leb_tangan3_2    String? @db.VarChar(255)
+  l_kerongan_2     String? @db.VarChar(255)
+  l_kerongan1_2    String? @db.VarChar(255)
+}
+
+model tbl_uk_jas_order {
+  ukuran_id        Int       @id @default(autoincrement())
+  order_id         Int
+  p_badan_d_das    String?   @db.VarChar(255)
+  p_badan_b_das    String?   @db.VarChar(255)
+  pundak_das       String?   @db.VarChar(255)
+  leb_bahu_das     String?   @db.VarChar(255)
+  p_tangan_das     String?   @db.VarChar(255)
+  badan_d_das      String?   @db.VarChar(255)
+  badan_b_das      String?   @db.VarChar(255)
+  dada_das         String?   @db.VarChar(255)
+  pinggang_das     String?   @db.VarChar(255)
+  pinggul_das      String?   @db.VarChar(255)
+  leher_das        String?   @db.VarChar(255)
+  p_badan_d_jadi   String?   @db.VarChar(255)
+  p_badan_b_jadi   String?   @db.VarChar(255)
+  pundak_jadi      String?   @db.VarChar(255)
+  leb_bahu_jadi    String?   @db.VarChar(255)
+  p_tangan_jadi    String?   @db.VarChar(255)
+  badan_d_jadi     String?   @db.VarChar(255)
+  badan_b_jadi     String?   @db.VarChar(255)
+  dada_jadi1       String?   @db.VarChar(255)
+  dada_jadi2       String?   @db.VarChar(255)
+  dada_jadi3       String?   @db.VarChar(255)
+  dada_t           String?   @db.VarChar(255)
+  pinggang_jadi1   String?   @db.VarChar(255)
+  pinggang_jadi2   String?   @db.VarChar(255)
+  pinggang_jadi3   String?   @db.VarChar(255)
+  pinggang_t       String?   @db.VarChar(255)
+  pinggul_jadi1    String?   @db.VarChar(255)
+  pinggul_jadi2    String?   @db.VarChar(255)
+  pinggul_jadi3    String?   @db.VarChar(255)
+  pinggul_t        String?   @db.VarChar(255)
+  leb_tangan1      String?   @db.VarChar(255)
+  leb_tangan2      String?   @db.VarChar(255)
+  leb_tangan3      String?   @db.VarChar(255)
+  l_kerongan       String?   @db.VarChar(255)
+  l_kerongan1      String?   @db.VarChar(255)
+  d_breast         String?   @db.VarChar(255)
+  d_breast1        String?   @db.VarChar(255)
+  p_badan_d_jadi_2 String?   @db.VarChar(255)
+  p_badan_b_jadi_2 String?   @db.VarChar(255)
+  pundak_jadi_2    String?   @db.VarChar(255)
+  leb_bahu_jadi_2  String?   @db.VarChar(255)
+  p_tangan_jadi_2  String?   @db.VarChar(255)
+  badan_d_jadi_2   String?   @db.VarChar(255)
+  badan_b_jadi_2   String?   @db.VarChar(255)
+  dada_jadi1_2     String?   @db.VarChar(255)
+  dada_jadi2_2     String?   @db.VarChar(255)
+  dada_jadi3_2     String?   @db.VarChar(255)
+  dada_t_2         String?   @db.VarChar(255)
+  pinggang_jadi1_2 String?   @db.VarChar(255)
+  pinggang_jadi2_2 String?   @db.VarChar(255)
+  pinggang_jadi3_2 String?   @db.VarChar(255)
+  pinggang_t_2     String?   @db.VarChar(255)
+  pinggul_jadi1_2  String?   @db.VarChar(255)
+  pinggul_jadi2_2  String?   @db.VarChar(255)
+  pinggul_jadi3_2  String?   @db.VarChar(255)
+  pinggul_t_2      String?   @db.VarChar(255)
+  leb_tangan1_2    String?   @db.VarChar(255)
+  leb_tangan2_2    String?   @db.VarChar(255)
+  leb_tangan3_2    String?   @db.VarChar(255)
+  l_kerongan_2     String?   @db.VarChar(255)
+  l_kerongan1_2    String?   @db.VarChar(255)
+  tbl_order        tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_uk_jas_order_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_uk_ps {
+  ukuran_id    Int     @id @default(autoincrement())
+  uk_ps        Int?
+  pelanggan_id String? @db.VarChar(255)
+  p_badan_d    String? @db.VarChar(255)
+  p_badan_b    String? @db.VarChar(255)
+  pundak       String? @db.VarChar(255)
+  leb_bahu     String? @db.VarChar(255)
+  p_tangan     String? @db.VarChar(255)
+  badan_d      String? @db.VarChar(255)
+  badan_b      String? @db.VarChar(255)
+  dada1        String? @db.VarChar(255)
+  dada2        String? @db.VarChar(255)
+  dada3        String? @db.VarChar(255)
+  dada_t       String? @db.VarChar(255)
+  pinggang1    String? @db.VarChar(255)
+  pinggang2    String? @db.VarChar(255)
+  pinggang3    String? @db.VarChar(255)
+  pinggang_t   String? @db.VarChar(255)
+  pinggul1     String? @db.VarChar(255)
+  pinggul2     String? @db.VarChar(255)
+  pinggul3     String? @db.VarChar(255)
+  pinggul_t    String? @db.VarChar(255)
+  leb_tangan1  String? @db.VarChar(255)
+  leb_tangan2  String? @db.VarChar(255)
+  leb_tangan3  String? @db.VarChar(255)
+  l_kerongan   String? @db.VarChar(255)
+  l_kerongan1  String? @db.VarChar(255)
+}
+
+model tbl_uk_ps_order {
+  ukuran_id   Int       @id @default(autoincrement())
+  order_id    Int
+  p_badan_d   String?   @db.VarChar(255)
+  p_badan_b   String?   @db.VarChar(255)
+  pundak      String?   @db.VarChar(255)
+  leb_bahu    String?   @db.VarChar(255)
+  p_tangan    String?   @db.VarChar(255)
+  badan_d     String?   @db.VarChar(255)
+  badan_b     String?   @db.VarChar(255)
+  dada1       String?   @db.VarChar(255)
+  dada2       String?   @db.VarChar(255)
+  dada3       String?   @db.VarChar(255)
+  dada_t      String?   @db.VarChar(255)
+  pinggang1   String?   @db.VarChar(255)
+  pinggang2   String?   @db.VarChar(255)
+  pinggang3   String?   @db.VarChar(255)
+  pinggang_t  String?   @db.VarChar(255)
+  pinggul1    String?   @db.VarChar(255)
+  pinggul2    String?   @db.VarChar(255)
+  pinggul3    String?   @db.VarChar(255)
+  pinggul_t   String?   @db.VarChar(255)
+  leb_tangan1 String?   @db.VarChar(255)
+  leb_tangan2 String?   @db.VarChar(255)
+  leb_tangan3 String?   @db.VarChar(255)
+  l_kerongan  String?   @db.VarChar(255)
+  l_kerongan1 String?   @db.VarChar(255)
+  tbl_order   tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_uk_ps_order_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_uk_rompi {
+  ukuran_id    Int     @id @default(autoincrement())
+  pelanggan_id String  @db.VarChar(255)
+  p_badan_d    String? @db.VarChar(255)
+  p_badan_b    String? @db.VarChar(255)
+  pundak       String? @db.VarChar(255)
+  badan_d      String? @db.VarChar(255)
+  badan_b      String? @db.VarChar(255)
+  pinggang_d   String? @db.VarChar(255)
+  pinggang_b   String? @db.VarChar(255)
+  pinggul_d    String? @db.VarChar(255)
+  pinggul_b    String? @db.VarChar(255)
+  l_ketiak_d   String? @db.VarChar(255)
+  l_ketiak_b   String? @db.VarChar(255)
+}
+
+model tbl_uk_rompi_order {
+  ukuran_id  Int       @id @default(autoincrement())
+  order_id   Int
+  p_badan_d  String?   @db.VarChar(255)
+  p_badan_b  String?   @db.VarChar(255)
+  pundak     String?   @db.VarChar(255)
+  badan_d    String?   @db.VarChar(255)
+  badan_b    String?   @db.VarChar(255)
+  pinggang_d String?   @db.VarChar(255)
+  pinggang_b String?   @db.VarChar(255)
+  pinggul_d  String?   @db.VarChar(255)
+  pinggul_b  String?   @db.VarChar(255)
+  l_ketiak_d String?   @db.VarChar(255)
+  l_ketiak_b String?   @db.VarChar(255)
+  tbl_order  tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_uk_rompi_order_ibfk_1")
+
+  @@index([order_id], map: "order_id")
+}
+
+model tbl_ukuran {
+  ukuran_id       Int     @id @default(autoincrement())
+  pelanggan_id    Int
+  leher           String? @db.VarChar(255)
+  dada            String? @db.VarChar(255)
+  perut           String? @db.VarChar(255)
+  pantat          String? @db.VarChar(255)
+  panjang_baju    String? @db.VarChar(255)
+  pundak          String? @db.VarChar(255)
+  dada1           String? @db.VarChar(255)
+  perut1          String? @db.VarChar(255)
+  pantat1         String? @db.VarChar(255)
+  panjang_baju1   String? @db.VarChar(255)
+  pundak1         String? @db.VarChar(255)
+  lengan          String? @db.VarChar(255)
+  pergelangan     String? @db.VarChar(255)
+  pergelangan1    String? @db.VarChar(255)
+  pinggul         String? @db.VarChar(255)
+  pinggul1        String? @db.VarChar(255)
+  inseam          String? @db.VarChar(255)
+  inseam1         String? @db.VarChar(255)
+  panjang_jacket  String? @db.VarChar(255)
+  panjang_jacket1 String? @db.VarChar(255)
+  keterangan      String? @db.VarChar(255)
+  keterangan1     String? @db.VarChar(255)
+  baju_jadi       String? @db.VarChar(255)
+  celana_jadi     String? @db.VarChar(255)
+  jas_jadi        String? @db.VarChar(255)
+  jacket_jadi     String? @db.VarChar(255)
+  pinggang        String? @db.VarChar(255)
+  panjang         String? @db.VarChar(255)
+  paha            String? @db.VarChar(255)
+  lutut           String? @db.VarChar(255)
+  kaki            String? @db.VarChar(255)
+  kil             String? @db.VarChar(255)
+  pinggul_celana  String? @db.VarChar(255)
+}
+
+model tbl_ukuran_order {
+  ukuran_id       Int       @id @default(autoincrement())
+  order_id        Int
+  leher           String?   @db.VarChar(255)
+  dada            String?   @db.VarChar(255)
+  perut           String?   @db.VarChar(255)
+  pantat          String?   @db.VarChar(255)
+  panjang_baju    String?   @db.VarChar(255)
+  pundak          String?   @db.VarChar(255)
+  dada1           String?   @db.VarChar(255)
+  perut1          String?   @db.VarChar(255)
+  pantat1         String?   @db.VarChar(255)
+  panjang_baju1   String?   @db.VarChar(255)
+  pundak1         String?   @db.VarChar(255)
+  lengan          String?   @db.VarChar(255)
+  pergelangan     String?   @db.VarChar(255)
+  pergelangan1    String?   @db.VarChar(255)
+  pinggul         String?   @db.VarChar(255)
+  pinggul1        String?   @db.VarChar(255)
+  inseam          String?   @db.VarChar(255)
+  inseam1         String?   @db.VarChar(255)
+  panjang_jacket  String?   @db.VarChar(255)
+  panjang_jacket1 String?   @db.VarChar(255)
+  keterangan      String?   @db.VarChar(255)
+  keterangan1     String?   @db.VarChar(255)
+  baju_jadi       String?   @db.VarChar(255)
+  celana_jadi     String?   @db.VarChar(255)
+  jas_jadi        String?   @db.VarChar(255)
+  jacket_jadi     String?   @db.VarChar(255)
+  pinggang        String?   @db.VarChar(255)
+  panjang         String?   @db.VarChar(255)
+  paha            String?   @db.VarChar(255)
+  lutut           String?   @db.VarChar(255)
+  kaki            String?   @db.VarChar(255)
+  kil             String?   @db.VarChar(255)
+  pinggul_celana  String?   @db.VarChar(255)
+  tbl_order       tbl_order @relation(fields: [order_id], references: [order_id], onDelete: Cascade, onUpdate: NoAction, map: "tbl_ukuran_order_ibfk_1")
+
+  @@index([order_id], map: "tbl_ukuran_order_ibfk_1")
+}
+
+model users {
+  id                BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name              String    @db.VarChar(255)
+  email             String    @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at DateTime? @db.Timestamp(0)
+  password          String    @db.VarChar(255)
+  role              String    @db.VarChar(255)
+  created_at        DateTime? @db.Timestamp(0)
+  updated_at        DateTime? @db.Timestamp(0)
+}

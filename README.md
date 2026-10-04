@@ -6,7 +6,7 @@ This NestJS service is an addition to the existing PHP application. The existing
 
 ## Current Scope
 
-N-002 provides the NestJS scaffold, configuration, health endpoint, and Swagger. N-003 adds a local MySQL 8 setup and Prisma for read-only access to an imported legacy database. The legacy schema is not included in this repository; Prisma models must come from `prisma db pull` after importing the real dump. Fonnte and notification logic are not implemented.
+N-002 provides the NestJS scaffold, configuration, health endpoint, and Swagger. N-003 adds a local MySQL 8 setup and Prisma for read-only access to an imported legacy database. The Prisma models in `prisma/schema.prisma` were introspected from the real legacy dump; the dump and its data are not stored in this repository. Fonnte and notification logic are not implemented.
 
 ## Requirements
 

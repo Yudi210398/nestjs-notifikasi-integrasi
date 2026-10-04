@@ -59,11 +59,11 @@ Implemented:
 - Swagger
 - Local MySQL 8 Compose setup and read-only database user initialization
 - Prisma MySQL configuration and NestJS `PrismaModule` / `PrismaService`
+- Prisma models introspected from the imported local legacy dump
 - Startup read of local database table metadata when credentials are configured
 
 Not implemented:
 
-- Legacy schema models until a real local dump is imported and `prisma db pull` succeeds
 - Legacy repository or queries against customer, fitting, or order tables
 - Fonnte integration
 - Notification logic
