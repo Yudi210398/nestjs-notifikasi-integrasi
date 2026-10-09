@@ -14,3 +14,4 @@ coverage/
 *.dump
 *.dump.gz
 mysql-data/
+test/fonnte-live.smoke.cjs

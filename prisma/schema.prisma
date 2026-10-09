@@ -562,3 +562,17 @@ model users {
   created_at        DateTime? @db.Timestamp(0)
   updated_at        DateTime? @db.Timestamp(0)
 }
+
+// Owned by NestJS. Provision explicitly with docker/mysql/provision-notification-log.sh.
+model NotificationLog {
+  id              Int      @id @default(autoincrement()) @db.UnsignedInt
+  notificationKey String   @unique(map: "notification_log_key_unique") @map("notification_key") @db.VarChar(191)
+  type            String   @db.VarChar(20)
+  sourceId        Int      @map("source_id")
+  status          String   @db.VarChar(20)
+  reason          String?  @db.VarChar(100)
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@map("notification_log")
+}

@@ -12,6 +12,7 @@ async function bootstrap() {
       "Internal NestJS service for WhatsApp notifications integrated with the existing PHP system.",
     )
     .setVersion("1.0")
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 

@@ -52,3 +52,22 @@ npm run start:dev
 `prisma db pull` reads the local database schema and writes models into `prisma/schema.prisma`. It does not change the database. `prisma generate` generates the client in `node_modules`. On startup, `PrismaService` connects with the read-only user and logs the number of tables visible in the local database. If the count is zero, the dump has not populated the configured database.
 
 Do not run Prisma migrations or `prisma db push` against the legacy database.
+
+## 5. Provision N-007 NotificationLog
+
+`notification_log` is a new NestJS-owned table in the same MySQL database. It has no foreign keys to legacy tables. Configure `NOTIFICATION_DB_USER=notification_writer` and a separate random **alphanumeric** `NOTIFICATION_DB_PASSWORD` in the ignored `.env` file. Keep `DB_USER` as the existing legacy reader. The passwords must differ. The writer account is granted `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on `notification_log` only. `DELETE` is used by the synthetic integration test cleanup; application delivery only inserts and updates.
+
+For a **new empty local MySQL volume**, Compose runs `docker/mysql/provision-notification-log.sh` at initialization. For the existing local volume, initialization scripts do not run again. Apply the script explicitly after updating the Compose configuration:
+
+```sh
+docker compose --env-file .env --env-file .env.docker up -d --no-deps mysql
+docker compose --env-file .env --env-file .env.docker exec -T mysql sh /docker-entrypoint-initdb.d/02-notification-log.sh
+npx prisma generate
+npm run test:notification-log:integration
+```
+
+The first command may recreate the local container but preserves the named `mysql_data` volume; it must never use `down -v`. The provisioning script creates only `notification_log` and a separate writer account. It does not alter or delete legacy tables. Do not run `prisma db pull` after adding the manual NotificationLog model unless you review the resulting schema changes; `prisma generate` alone is enough.
+
+The integration test uses synthetic `ORDER_READY:<id>` keys and a mocked Fonnte service. It removes only the rows whose keys it created. It verifies the UNIQUE constraint, two concurrent claims, one provider call, duplicate blocking for every status, and grants without attempting any legacy UPDATE. If the test aborts before cleanup, inspect and remove only its synthetic rows from `notification_log`.
+
+For production, a database administrator should review the same table DDL in `docker/mysql/provision-notification-log.sh`, create the table and dedicated writer account in the target MySQL database, and grant only `SELECT`, `INSERT`, and `UPDATE` on `notification_log`. The local script grants `DELETE` solely for integration test cleanup; runtime delivery never deletes rows. Verify `SHOW GRANTS` for both accounts. Do not give the writer privileges on legacy tables or change the reader's SELECT-only grant. Production deployment and credential distribution are outside N-007.
