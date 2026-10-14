@@ -1,9 +1,9 @@
 import { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
-import { InternalApiKeyGuard } from "./internal-api-key.guard";
+import { InternalApiKeyGuard } from "../guards/internal-api-key.guard";
 import { OrderReadyTriggerController } from "./order-ready-trigger.controller";
-import { OrderReadyTriggerService } from "./order-ready-trigger.service";
+import { OrderReadyTriggerService } from "../services/order-ready-trigger.service";
 
 describe("POST /internal/notifications/order-ready", () => {
   let app: INestApplication;

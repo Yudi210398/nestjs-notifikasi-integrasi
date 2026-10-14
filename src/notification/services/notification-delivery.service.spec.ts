@@ -1,6 +1,6 @@
 import { FonnteWhatsappService } from "./fonnte-whatsapp.service";
 import { NotificationDeliveryService } from "./notification-delivery.service";
-import { NotificationLogRepository } from "./notification-log.repository";
+import { NotificationLogRepository } from "../repositories/notification-log.repository";
 import { NotificationCandidate } from "./notification.service";
 
 const orderCandidate: NotificationCandidate = {
@@ -21,6 +21,7 @@ const fittingCandidate: NotificationCandidate = {
   customerName: "Contoh",
   phone: "test-phone",
   fittingDate: new Date("2026-10-10"),
+  categoryName: "Jas",
 };
 
 function setup() {

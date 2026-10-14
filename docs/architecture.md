@@ -27,7 +27,7 @@ PHP Event
 → WhatsApp Customer
 ```
 
-N-008A implements the authenticated NestJS order-ready endpoint. PHP integration and the fitting scheduler remain future work.
+N-008A implements the authenticated NestJS order-ready endpoint. N-008B implements fitting reminder scheduling. PHP-side event integration remains future work.
 
 ## Module Responsibilities
 
@@ -35,6 +35,7 @@ N-008A implements the authenticated NestJS order-ready endpoint. PHP integration
 - `HealthModule`: health endpoint.
 - `NotificationModule`: provides the legacy read repository and `NotificationService`.
 - `NotificationService`: reads through `LegacyReadRepository` and returns READY candidates or SKIP reasons without sending messages.
+- `FittingReminderScheduler`: when enabled, scans eligible fittings from 11:00 through 20:30 Asia/Jakarta, builds their message, and delegates delivery to N-007.
 - `FonnteWhatsappService`: sends caller-provided phone and message through Fonnte and reports accepted, rejected, or uncertain outcomes.
 - `NotificationLogRepository`: atomically claims a unique notification identity as PENDING and persists final status or explicit SKIPPED reason.
 - `NotificationDeliveryService`: for a READY candidate and caller-provided message, claims before calling Fonnte and maps its result to the log. It never retries.
@@ -55,7 +56,7 @@ The introspected schema has no Prisma relation between these three tables becaus
 
 `prepareOrderReadyNotification(orderId)` returns READY only when `order_status` is exactly `Selesai`, the customer exists with a nonblank phone, and the category exists. The candidate contains customer and category data read from the legacy database. Other cases return SKIP with a specific reason.
 
-`prepareFittingReminder(fittingId)` returns READY when the fitting has an order with `tgl_coba` and a customer with a nonblank phone. It does not decide when the reminder is due or interpret `fitting_status`. The repository returns `null` for both missing fittings and fittings whose order is missing, so both produce `FITTING_DATA_INCOMPLETE`; this result cannot distinguish those cases. No message text, provider call, persistence, retry, or duplicate protection is part of N-005.
+`prepareFittingReminder(fittingId, forDate)` reads the fitting/order again and requires a matching MySQL DATE and exactly NULL fitting status. It reads customer and category from the legacy database and returns the category name in the fitting candidate. Missing fitting/order/date returns `FITTING_DATA_INCOMPLETE`; other fitting reasons include `FITTING_NOT_PENDING`, `FITTING_NOT_DUE`, `CUSTOMER_NOT_FOUND`, `PHONE_MISSING`, and `CATEGORY_NOT_FOUND`. Clock and cron concerns remain in the scheduler. Preparation never sends or writes logs.
 
 ## N-006 Fonnte Transport
 
@@ -97,10 +98,10 @@ Implemented:
 - N-004 read-only customer, order, category, and fitting repository queries with unit tests
 - N-007 NotificationLog schema, atomic claim, status updates, explicit SKIPPED capability, and delivery orchestration
 - N-008A internal order-ready endpoint, API key guard, message construction, and delivery trigger
+- N-008B fitting reminder scheduler with Jakarta calendar selection, startup catch-up, and N-007 delivery
 
 Not implemented:
 
-- Scheduler
 - PHP-side order-ready event call
 - NestJS containerization
 
@@ -118,5 +119,38 @@ SKIP selain `PHONE_MISSING` dikembalikan tanpa klaim key. `PHONE_MISSING`
 dicatat dengan `recordSkipped`; konflik key menjadi `DUPLICATE`.
 Hasil bisnis memakai HTTP 200 agar PHP tidak mengulang otomatis hasil
 `FAILED` atau `AMBIGUOUS`. Kesalahan sebelum outcome pasti diketahui
-tetap error server. Tidak ada scheduler fitting, retry, atau perubahan
+tetap error server. Endpoint order-ready tidak melakukan retry atau perubahan
 pada tabel bisnis legacy.
+
+## N-008B Fitting Reminder Scheduler
+
+`ScheduleModule.forRoot()` didaftarkan sekali di `AppModule`.
+`FittingReminderScheduler` hanya scan jika `FITTING_REMINDER_ENABLED` bernilai
+persis `true`; env tidak ada atau nilai lain membuatnya disabled. Saat enabled,
+scan berjalan pada application bootstrap dan cron `0 */30 11-20 * * *` dengan
+`timeZone: Asia/Jakarta`. Window inklusif menit 11:00-20:30; mulai 20:31
+tidak scan. Sebelum klaim kandidat, scheduler memeriksa ulang tanggal, waktu,
+dan switch. Flag lokal mencegah
+overlap scan pada satu instance; UNIQUE `notification_log` tetap menjadi
+pengaman final untuk beberapa instance.
+
+`Intl.DateTimeFormat` dengan timezone Jakarta menentukan tahun, bulan, hari,
+dan jam sekarang. Hari tersebut diwakili sebagai UTC midnight untuk kolom
+Prisma `DateTime @db.Date`; ini nilai kalender, bukan waktu event UTC.
+Repository memilih ID order dengan `tgl_coba` tepat tanggal tersebut lalu
+ID fitting dengan `order_id` terkait dan `fitting_status: null`. Ketiadaan
+foreign key tidak memerlukan perubahan schema. Preparation membaca ulang
+tanggal/status sebelum membuat kandidat. Scan yang melewati tengah malam
+Jakarta atau melewati 20:30 berhenti sebelum claim kandidat berikutnya.
+
+Kandidat READY dikirim secara berurutan melalui `NotificationDeliveryService`.
+Nomor kosong dicatat SKIPPED melalui `recordSkipped` pada `FITTING:<id>`;
+SKIP lain tidak dicatat permanen. Gagal scan/read/claim tidak melakukan send
+untuk fitting itu. Error satu fitting tidak menghentikan fitting lain, dan log
+error hanya memuat kode pesan umum serta fitting ID, tanpa PII atau exception raw.
+
+SENT/FAILED/AMBIGUOUS tetap mengikuti N-006/N-007. Crash setelah PENDING
+atau gagal final-status write dapat meninggalkan PENDING dan memblokir resend.
+Fitting kemarin tidak diproses setelah downtime melewati hari Jakarta.
+Production flow hanya INSERT/UPDATE `notification_log`; integration test
+membersihkan hanya row sintetisnya dengan DELETE.

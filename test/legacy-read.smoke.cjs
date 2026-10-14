@@ -4,7 +4,7 @@ require("dotenv").config({ quiet: true });
 const { PrismaService } = require("../dist/prisma/prisma.service");
 const {
   LegacyReadRepository,
-} = require("../dist/notification/legacy-read.repository");
+} = require("../dist/notification/repositories/legacy-read.repository");
 
 async function main() {
   const prisma = new PrismaService(new ConfigService());

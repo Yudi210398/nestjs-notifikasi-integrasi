@@ -1,5 +1,5 @@
 import { NotificationDeliveryService } from "./notification-delivery.service";
-import { NotificationLogRepository } from "./notification-log.repository";
+import { NotificationLogRepository } from "../repositories/notification-log.repository";
 import { NotificationService } from "./notification.service";
 import { OrderReadyTriggerService } from "./order-ready-trigger.service";
 

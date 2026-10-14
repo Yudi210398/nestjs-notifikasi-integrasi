@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { NotificationLogPrismaService } from "../prisma/notification-log-prisma.service";
-import type { NotificationCandidate } from "./notification.service";
+import { NotificationLogPrismaService } from "../../prisma/notification-log-prisma.service";
+import type { NotificationCandidate } from "../services/notification.service";
 
 export type NotificationIdentity = {
   notificationKey: string;

@@ -1,14 +1,14 @@
 import { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
-import { FonnteWhatsappService } from "./fonnte-whatsapp.service";
-import { InternalApiKeyGuard } from "./internal-api-key.guard";
-import { LegacyReadRepository } from "./legacy-read.repository";
-import { NotificationDeliveryService } from "./notification-delivery.service";
-import { NotificationLogRepository } from "./notification-log.repository";
-import { NotificationService } from "./notification.service";
-import { OrderReadyTriggerController } from "./order-ready-trigger.controller";
-import { OrderReadyTriggerService } from "./order-ready-trigger.service";
+import { FonnteWhatsappService } from "../services/fonnte-whatsapp.service";
+import { InternalApiKeyGuard } from "../guards/internal-api-key.guard";
+import { LegacyReadRepository } from "../repositories/legacy-read.repository";
+import { NotificationDeliveryService } from "../services/notification-delivery.service";
+import { NotificationLogRepository } from "../repositories/notification-log.repository";
+import { NotificationService } from "../services/notification.service";
+import { OrderReadyTriggerController } from "../controllers/order-ready-trigger.controller";
+import { OrderReadyTriggerService } from "../services/order-ready-trigger.service";
 
 describe("Order ready HTTP flow", () => {
   let app: INestApplication;

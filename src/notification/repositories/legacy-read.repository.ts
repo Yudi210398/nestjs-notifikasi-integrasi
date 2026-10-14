@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
 export class LegacyReadRepository {
@@ -41,6 +41,25 @@ export class LegacyReadRepository {
     });
   }
 
+  async findDueFittingsForDate(forDate: Date) {
+    const orders = await this.prisma.tbl_order.findMany({
+      where: { tgl_coba: forDate },
+      select: { order_id: true },
+    });
+    if (orders.length === 0) {
+      return [];
+    }
+
+    return this.prisma.tbl_fitting.findMany({
+      where: {
+        order_id: { in: orders.map((order) => order.order_id) },
+        fitting_status: null,
+      },
+      select: { fitting_id: true },
+      orderBy: { fitting_id: "asc" },
+    });
+  }
+
   async findFittingById(fittingId: number) {
     const fitting = await this.prisma.tbl_fitting.findUnique({
       where: { fitting_id: fittingId },
@@ -60,6 +79,7 @@ export class LegacyReadRepository {
       select: {
         pelanggan_id: true,
         tgl_coba: true,
+        category_id: true,
       },
     });
 

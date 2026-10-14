@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { LegacyReadRepository } from "./legacy-read.repository";
+import { LegacyReadRepository } from "../repositories/legacy-read.repository";
 
 type SkipReason =
   | "ORDER_NOT_FOUND"
@@ -27,11 +27,28 @@ export type NotificationCandidate =
       customerName: string;
       phone: string;
       fittingDate: Date;
+      categoryName: string;
     };
 
 export type NotificationPreparationResult =
   | { decision: "READY"; candidate: NotificationCandidate }
   | { decision: "SKIP"; reason: SkipReason };
+
+export type FittingReminderPreparationResult =
+  | {
+      decision: "READY";
+      candidate: Extract<NotificationCandidate, { type: "FITTING_REMINDER" }>;
+    }
+  | {
+      decision: "SKIP";
+      reason:
+        | "FITTING_DATA_INCOMPLETE"
+        | "FITTING_NOT_PENDING"
+        | "FITTING_NOT_DUE"
+        | "CUSTOMER_NOT_FOUND"
+        | "PHONE_MISSING"
+        | "CATEGORY_NOT_FOUND";
+    };
 
 @Injectable()
 export class NotificationService {
@@ -84,10 +101,18 @@ export class NotificationService {
 
   async prepareFittingReminder(
     fittingId: number,
-  ): Promise<NotificationPreparationResult> {
+    forDate: Date,
+  ): Promise<FittingReminderPreparationResult> {
     const fitting = await this.legacyReadRepository.findFittingById(fittingId);
     if (!fitting?.tgl_coba) {
       return { decision: "SKIP", reason: "FITTING_DATA_INCOMPLETE" };
+    }
+
+    if (fitting.fitting_status !== null) {
+      return { decision: "SKIP", reason: "FITTING_NOT_PENDING" };
+    }
+    if (fitting.tgl_coba.getTime() !== forDate.getTime()) {
+      return { decision: "SKIP", reason: "FITTING_NOT_DUE" };
     }
 
     const customer = await this.legacyReadRepository.findCustomerById(
@@ -102,6 +127,13 @@ export class NotificationService {
       return { decision: "SKIP", reason: "PHONE_MISSING" };
     }
 
+    const category = await this.legacyReadRepository.findCategoryById(
+      fitting.category_id,
+    );
+    if (!category) {
+      return { decision: "SKIP", reason: "CATEGORY_NOT_FOUND" };
+    }
+
     return {
       decision: "READY",
       candidate: {
@@ -112,6 +144,7 @@ export class NotificationService {
         customerName: customer.pelanggan_nama,
         phone,
         fittingDate: fitting.tgl_coba,
+        categoryName: category.category_nama,
       },
     };
   }

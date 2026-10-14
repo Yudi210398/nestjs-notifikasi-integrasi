@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   LegacyReadRepository,
-} = require("../dist/notification/legacy-read.repository");
+} = require("../dist/notification/repositories/legacy-read.repository");
 
 function repositoryWith(responses) {
   const calls = [];
@@ -109,9 +109,13 @@ test("category yang tidak ada menghasilkan null", async () => {
   assert.equal(await repository.findCategoryById(99), null);
 });
 
-test("fitting dibaca bersama tanggal coba dan ID customer dari order", async () => {
+test("fitting dibaca bersama tanggal coba dan ID customer/category dari order", async () => {
   const fitting = { fitting_id: 4, order_id: 10, fitting_status: "apa saja" };
-  const order = { pelanggan_id: 7, tgl_coba: new Date("2026-10-07") };
+  const order = {
+    pelanggan_id: 7,
+    category_id: 3,
+    tgl_coba: new Date("2026-10-07"),
+  };
   const { repository, calls } = repositoryWith({
     tbl_fitting: fitting,
     tbl_order: order,
@@ -133,7 +137,7 @@ test("fitting dibaca bersama tanggal coba dan ID customer dari order", async () 
       table: "tbl_order",
       query: {
         where: { order_id: 10 },
-        select: { pelanggan_id: true, tgl_coba: true },
+        select: { pelanggan_id: true, tgl_coba: true, category_id: true },
       },
     },
   ]);

@@ -8,8 +8,8 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
-import { InternalApiKeyGuard } from "./internal-api-key.guard";
-import { OrderReadyTriggerService } from "./order-ready-trigger.service";
+import { InternalApiKeyGuard } from "../guards/internal-api-key.guard";
+import { OrderReadyTriggerService } from "../services/order-ready-trigger.service";
 
 @ApiTags("Internal notifications")
 @ApiBearerAuth()

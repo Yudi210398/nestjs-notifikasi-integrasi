@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { NotificationDeliveryService } from "./notification-delivery.service";
-import { NotificationLogRepository } from "./notification-log.repository";
+import { NotificationLogRepository } from "../repositories/notification-log.repository";
 import { NotificationService } from "./notification.service";
 
 export type OrderReadyTriggerResult =

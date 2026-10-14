@@ -6,7 +6,7 @@ This NestJS service is an addition to the existing PHP application. The existing
 
 ## Current Scope
 
-N-002 provides the NestJS scaffold, configuration, health endpoint, and Swagger. N-003 adds a local MySQL 8 setup and Prisma for read-only access to an imported legacy database. N-004 adds repository queries for customer, order, category, and fitting records. N-005 adds `NotificationService` to prepare order-ready and fitting-reminder candidates or return SKIP reasons. N-006 adds `FonnteWhatsappService` as a transport for caller-provided phone and message. N-007 adds a NestJS-owned `notification_log` table, atomic claim, and idempotent delivery orchestration. The legacy Prisma models were introspected from the real dump; the dump and its data are not stored in this repository. N-008A adds the authenticated internal order-ready trigger; fitting scheduling remains outside this scope.
+N-002 provides the NestJS scaffold, configuration, health endpoint, and Swagger. N-003 adds a local MySQL 8 setup and Prisma for read-only access to an imported legacy database. N-004 adds repository queries for customer, order, category, and fitting records. N-005 adds `NotificationService` to prepare order-ready and fitting-reminder candidates or return SKIP reasons. N-006 adds `FonnteWhatsappService` as a transport for caller-provided phone and message. N-007 adds a NestJS-owned `notification_log` table, atomic claim, and idempotent delivery orchestration. The legacy Prisma models were introspected from the real dump; the dump and its data are not stored in this repository. N-008A adds the authenticated internal order-ready trigger. N-008B adds the automatic fitting reminder scheduler.
 
 ## Requirements
 
@@ -49,7 +49,7 @@ npm run build
 
 ## Test
 
-Jest runs TypeScript `*.spec.ts` files placed under `src/` through `ts-jest`, without building `dist/` first. The N-005 business rules are covered by `src/notification/notification.service.spec.ts` with a mocked repository.
+Jest runs TypeScript `*.spec.ts` files placed under `src/` through `ts-jest`, without building `dist/` first. The N-005 business rules are covered by `src/notification/services/notification.service.spec.ts` with a mocked repository.
 
 ```sh
 npm test
@@ -97,7 +97,7 @@ Fonnte
 WhatsApp Customer
 ```
 
-N-005 prepares notification candidates, N-006 provides the Fonnte transport, and N-007 provides idempotent delivery for a READY candidate plus caller-provided message. N-008A invokes delivery only for an authenticated order-ready trigger. Fitting scheduling is not implemented. See [docs/architecture.md](docs/architecture.md) for the runtime flow and module responsibilities.
+N-005 prepares notification candidates, N-006 provides the Fonnte transport, and N-007 provides idempotent delivery for a READY candidate plus caller-provided message. N-008A invokes delivery for an authenticated order-ready trigger. N-008B invokes delivery for eligible fittings from the daily scheduler. See [docs/architecture.md](docs/architecture.md) for the runtime flow and module responsibilities.
 
 ## Scope Boundaries
 
@@ -124,3 +124,30 @@ dan kegagalan internal tak terduga mendapat 500 tanpa detail database.
 `notification_log` mencegah pengiriman ulang, termasuk saat request bersamaan.
 PHP tidak boleh melakukan blind retry untuk respons `FAILED` atau
 `AMBIGUOUS`. Endpoint tidak mengubah tabel bisnis legacy.
+
+## Fitting Reminder Scheduler (N-008B)
+
+Scheduler hanya scan jika `FITTING_REMINDER_ENABLED=true` persis. Nilai `false`,
+nilai lain, atau env yang tidak ada menonaktifkan scan, termasuk saat startup.
+Set `FITTING_REMINDER_ENABLED=true` secara eksplisit di production setelah siap
+mengirim reminder sungguhan.
+
+Saat diaktifkan, scheduler scan saat startup dan setiap 30 menit mulai 11:00
+sampai 20:30 Asia/Jakarta. Menit 20:30 masih termasuk window; mulai 20:31
+tidak ada scan atau pengiriman baru. Restart dalam window langsung memproses
+fitting hari itu tanpa menunggu cron berikutnya. Automated test memakai mock Fonnte.
+
+Eligible hanya `tbl_order.tgl_coba = hari Jakarta hari ini` dan
+`tbl_fitting.fitting_status IS NULL`. String kosong bukan NULL, dan fitting kemarin
+atau besok tidak dikirim. Preparation membaca ulang fitting/order, memeriksa
+tanggal dan status, lalu mengambil customer dan category dari database.
+
+Pesan: `Halo Pak/Bu {customerName}, hari ini ada fitting {categoryName}. Toko buka jam 11.00 - 20.30. Terima kasih.`
+`Pak/Bu` literal; nama pakaian mengikuti category DB. Jam 20.30 juga menjadi
+batas akhir menit pemrosesan pada hari fitting yang sama.
+
+Nomor HP null/kosong/whitespace mengikuti rule existing dan dicatat `SKIPPED`
+dengan key `FITTING:<fittingId>`. SKIP lain tidak mengonsumsi key. Delivery memakai
+atomic claim N-007; existing PENDING/SENT/FAILED/SKIPPED/AMBIGUOUS memblokir send
+berikutnya, termasuk setelah nomor diperbaiki atau tanggal fitting berubah.
+Tidak ada retry Fonnte otomatis. Tabel legacy tetap SELECT-only.

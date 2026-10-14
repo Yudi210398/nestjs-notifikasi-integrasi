@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { FonnteWhatsappService } from "./fonnte-whatsapp.service";
-import { NotificationLogRepository } from "./notification-log.repository";
+import { NotificationLogRepository } from "../repositories/notification-log.repository";
 import type { NotificationCandidate } from "./notification.service";
 
 export type NotificationDeliveryResult = {

@@ -1,4 +1,4 @@
-import { LegacyReadRepository } from "./legacy-read.repository";
+import { LegacyReadRepository } from "../repositories/legacy-read.repository";
 import { NotificationService } from "./notification.service";
 
 const order = {
@@ -21,8 +21,10 @@ const fitting = {
   order_id: 11,
   fitting_status: null,
   pelanggan_id: 22,
+  category_id: 33,
   tgl_coba: new Date("2026-10-09"),
 };
+const fittingDay = new Date("2026-10-09T00:00:00.000Z");
 
 function setup() {
   const repository = {
@@ -141,7 +143,9 @@ describe("NotificationService fitting reminder", () => {
     const { repository, service } = setup();
     repository.findFittingById.mockResolvedValue(null);
 
-    await expect(service.prepareFittingReminder(44)).resolves.toEqual({
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toEqual({
       decision: "SKIP",
       reason: "FITTING_DATA_INCOMPLETE",
     });
@@ -154,7 +158,9 @@ describe("NotificationService fitting reminder", () => {
       tgl_coba: null,
     });
 
-    await expect(service.prepareFittingReminder(44)).resolves.toEqual({
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toEqual({
       decision: "SKIP",
       reason: "FITTING_DATA_INCOMPLETE",
     });
@@ -164,7 +170,9 @@ describe("NotificationService fitting reminder", () => {
     const { repository, service } = setup();
     repository.findCustomerById.mockResolvedValue(null);
 
-    await expect(service.prepareFittingReminder(44)).resolves.toEqual({
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toEqual({
       decision: "SKIP",
       reason: "CUSTOMER_NOT_FOUND",
     });
@@ -179,17 +187,21 @@ describe("NotificationService fitting reminder", () => {
         pelanggan_hp: phone,
       });
 
-      await expect(service.prepareFittingReminder(44)).resolves.toEqual({
+      await expect(
+        service.prepareFittingReminder(44, fittingDay),
+      ).resolves.toEqual({
         decision: "SKIP",
         reason: "PHONE_MISSING",
       });
     },
   );
 
-  it("READY dengan tanggal fitting tanpa keputusan timing", async () => {
+  it("READY dengan tanggal fitting dan category dari legacy", async () => {
     const { repository, service } = setup();
 
-    await expect(service.prepareFittingReminder(44)).resolves.toEqual({
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toEqual({
       decision: "READY",
       candidate: {
         type: "FITTING_REMINDER",
@@ -199,9 +211,76 @@ describe("NotificationService fitting reminder", () => {
         customerName: "Customer contoh",
         phone: "phone-token",
         fittingDate: new Date("2026-10-09"),
+        categoryName: "Jas",
       },
     });
     expect(repository.findFittingById).toHaveBeenCalledWith(44);
     expect(repository.findCustomerById).toHaveBeenCalledWith(22);
+    expect(repository.findCategoryById).toHaveBeenCalledWith(33);
+  });
+
+  it.each(["Selesai", "", "selesai", " ", "2/5"])(
+    "status fitting %j selain NULL tidak menghasilkan reminder",
+    async (status) => {
+      const { repository, service } = setup();
+      repository.findFittingById.mockResolvedValue({
+        ...fitting,
+        fitting_status: status,
+      });
+
+      await expect(
+        service.prepareFittingReminder(44, fittingDay),
+      ).resolves.toEqual({
+        decision: "SKIP",
+        reason: "FITTING_NOT_PENDING",
+      });
+      expect(repository.findCustomerById).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["2026-10-08", "2026-10-10"])(
+    "fitting bertanggal %s di luar tanggal scan tidak menghasilkan reminder",
+    async (date) => {
+      const { repository, service } = setup();
+      repository.findFittingById.mockResolvedValue({
+        ...fitting,
+        tgl_coba: new Date(date),
+      });
+
+      await expect(
+        service.prepareFittingReminder(44, fittingDay),
+      ).resolves.toEqual({
+        decision: "SKIP",
+        reason: "FITTING_NOT_DUE",
+      });
+      expect(repository.findCustomerById).not.toHaveBeenCalled();
+    },
+  );
+
+  it("category fitting yang tidak ditemukan menghasilkan SKIP", async () => {
+    const { repository, service } = setup();
+    repository.findCategoryById.mockResolvedValue(null);
+
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toEqual({
+      decision: "SKIP",
+      reason: "CATEGORY_NOT_FOUND",
+    });
+  });
+
+  it("nama pakaian fitting mengikuti category DB, bukan mapping hard-code", async () => {
+    const { repository, service } = setup();
+    repository.findCategoryById.mockResolvedValue({
+      category_id: 33,
+      category_nama: "Celana",
+    });
+
+    await expect(
+      service.prepareFittingReminder(44, fittingDay),
+    ).resolves.toMatchObject({
+      decision: "READY",
+      candidate: { categoryName: "Celana" },
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { NotificationLogPrismaService } from "../prisma/notification-log-prisma.service";
+import { NotificationLogPrismaService } from "../../prisma/notification-log-prisma.service";
 import { NotificationLogRepository } from "./notification-log.repository";
 
 function setup() {
