@@ -12,6 +12,7 @@ const jakartaFormatter = new Intl.DateTimeFormat("en-CA", {
   month: "2-digit",
   day: "2-digit",
   hour: "2-digit",
+  minute: "2-digit",
   hourCycle: "h23",
 });
 
@@ -37,12 +38,14 @@ export class FittingReminderScheduler implements OnApplicationBootstrap {
     timeZone: "Asia/Jakarta",
   })
   async run(): Promise<void> {
+    if (this.configService.get<string>("FITTING_REMINDER_ENABLED") !== "true")
+      return;
     if (this.running) return;
     this.running = true;
 
     try {
       const today = this.jakartaNow();
-      if (today.hour < 11) return;
+      if (!this.isWithinSendWindow(today)) return;
 
       const fittings = await this.legacyReadRepository.findDueFittingsForDate(
         today.date,
@@ -56,7 +59,9 @@ export class FittingReminderScheduler implements OnApplicationBootstrap {
             );
           const current = this.jakartaNow();
           if (
-            current.hour < 11 ||
+            this.configService.get<string>("FITTING_REMINDER_ENABLED") !==
+              "true" ||
+            !this.isWithinSendWindow(current) ||
             current.date.getTime() !== today.date.getTime()
           ) {
             break;
@@ -99,6 +104,14 @@ export class FittingReminderScheduler implements OnApplicationBootstrap {
     return {
       date: new Date(Date.UTC(value("year"), value("month") - 1, value("day"))),
       hour: value("hour"),
+      minute: value("minute"),
     };
+  }
+
+  private isWithinSendWindow(now: { hour: number; minute: number }): boolean {
+    return (
+      now.hour >= 11 &&
+      (now.hour < 20 || (now.hour === 20 && now.minute <= 30))
+    );
   }
 }
