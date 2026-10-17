@@ -56,7 +56,7 @@ Salin [.env.example](.env.example) menjadi `.env`, lalu isi sesuai lingkungan lo
 | Nama | Kegunaan |
 |---|---|
 | `PORT` | Port HTTP NestJS. |
-| `DB_HOST`, `DB_PORT`, `DB_NAME` | Lokasi dan nama database legacy lokal. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Lokasi dan nama database legacy; host NestJS lokal memakai `127.0.0.1`, container Compose memakai `mysql`. |
 | `DB_USER`, `DB_PASSWORD` | Akun pembaca legacy dengan hak SELECT saja. |
 | `NOTIFICATION_DB_USER`, `NOTIFICATION_DB_PASSWORD` | Akun writer yang dibatasi ke `notification_log`. |
 | `FONNTE_TOKEN` | Token device Fonnte untuk transport WhatsApp. |
@@ -75,6 +75,21 @@ npm run start:dev
 ```
 
 Build dan jalankan hasil build dengan `npm run build` lalu `npm run start:prod`. Pastikan scheduler tetap disabled di lokal kecuali memang sedang melakukan pengujian terkontrol dengan provider mock.
+
+### NestJS dalam Docker lokal
+
+Compose tetap menjalankan MySQL development seperti sebelumnya. Service `app` hanya aktif dengan profile `app` dan terhubung ke MySQL melalui hostname Compose `mysql`. Siapkan `.env` dan `.env.docker` menurut [docs/local-database.md](docs/local-database.md), termasuk provisioning `notification_log`, kemudian jalankan:
+
+```sh
+docker compose --env-file .env --env-file .env.docker --profile app build app
+docker compose --env-file .env --env-file .env.docker --profile app up -d app
+```
+
+Periksa `http://localhost:3000/health` dan `http://localhost:3000/docs` (atau port `PORT` lokal yang dipilih). `/health` hanya membuktikan HTTP hidup; log startup memverifikasi kedua koneksi DB saat aplikasi dimulai. Compose lokal memaksa `FITTING_REMINDER_ENABLED=false` dan `FONNTE_TOKEN` kosong, sehingga startup dan smoke tanpa order valid tidak mengirim WhatsApp. `INTERNAL_API_KEY` dibaca dari `.env` saat runtime untuk pengujian autentikasi lokal. Jangan mengirim order customer valid dalam smoke ini.
+
+Image dibuat dengan Node 24 Debian: NestJS 11 mensyaratkan Node 20+, Prisma 6 yang terpasang mendukung Node 18.18+, dan lingkungan development yang diperiksa memakai Node 24. Build menjalankan `npm ci`, `prisma generate`, dan kompilasi; container menjalankan `node dist/main.js` sebagai user non-root. `.dockerignore` mengecualikan `.env`, dump SQL, dan artefak lokal dari build context; secret aplikasi hanya diinjeksikan saat runtime.
+
+Untuk production, jalankan **hanya container NestJS** yang terhubung ke MySQL perusahaan existing melalui `DB_HOST` privat. Jangan menjalankan service MySQL Compose lokal di server production. DBA menyiapkan `notification_log` dan grant writer secara terpisah; runtime tidak menjalankan migrasi atau `db push`. Reader tetap SELECT-only, writer hanya pada `notification_log`. Konfigurasikan token Fonnte sebelum menerima trigger valid atau mengaktifkan scheduler; default scheduler tetap disabled. Batasi `/docs` dan endpoint internal lewat jaringan/reverse proxy. Deployment server, akses DB/grant, wiring PHP, serta smoke provider live masih menunggu verifikasi eksternal.
 
 ## Test
 
@@ -96,8 +111,8 @@ Saat service berjalan, buka `http://localhost:<PORT>/docs`. Swagger menjelaskan 
 - Jangan menjalankan live Fonnte test dengan data customer.
 - Jangan menjalankan `docker compose down -v` kecuali memang ingin menghancurkan database lokal.
 - Jangan commit `.env` atau credential lain.
-- Akses production ke `/docs` dan endpoint internal perlu dibatasi oleh jaringan/deployment saat N-010.
+- Akses production ke `/docs` dan endpoint internal harus dibatasi oleh jaringan/deployment.
 
 ## Batas implementasi saat ini
 
-Sisi endpoint NestJS telah diuji, tetapi wiring pemanggilan **PHP → NestJS** belum terverifikasi. Live Fonnte smoke test tetap manual. Docker/deployment production dan verifikasi environment production termasuk pekerjaan berikutnya, bukan bagian dari fitur yang sudah terbukti di repository ini.
+Sisi endpoint NestJS telah diuji, tetapi wiring pemanggilan **PHP → NestJS** belum terverifikasi. Live Fonnte smoke test tetap manual. Packaging Docker lokal tidak membuktikan deployment pada server production.

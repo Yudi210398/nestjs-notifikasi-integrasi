@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 const databaseKeys = [
   "DB_HOST",
   "DB_PORT",
@@ -26,8 +28,17 @@ export function databaseUrlFromEnv(
   }
 
   const host = environment.DB_HOST!;
-  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(host)) {
-    throw new Error("DB_HOST must point to local MySQL for N-003.");
+  const unbracketedHost =
+    host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  const ipv6 = isIP(unbracketedHost) === 6;
+  const hostname =
+    host.length <= 253 &&
+    /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
+      host,
+    ) &&
+    (!/^[0-9.]+$/.test(host) || isIP(host) === 4);
+  if (!ipv6 && !hostname) {
+    throw new Error("DB_HOST must be a valid hostname or IP address.");
   }
 
   const port = Number(environment.DB_PORT);
@@ -35,8 +46,8 @@ export function databaseUrlFromEnv(
     throw new Error("DB_PORT must be an integer from 1 to 65535.");
   }
 
-  const localHost = host === "::1" ? "[::1]" : host;
-  const url = new URL(`mysql://${localHost}:${port}`);
+  const urlHost = ipv6 ? `[${unbracketedHost}]` : host;
+  const url = new URL(`mysql://${urlHost}:${port}`);
   url.username = environment.DB_USER!;
   url.password = environment.DB_PASSWORD!;
   url.pathname = `/${encodeURIComponent(environment.DB_NAME!)}`;

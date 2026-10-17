@@ -44,8 +44,8 @@ N-008A implements the authenticated NestJS order-ready endpoint. N-008B implemen
 - `NotificationLogPrismaService`: separate writer connection, configured with `NOTIFICATION_DB_*`; it must not fall back to the legacy reader credential.
 - `main.ts`: application bootstrap, Swagger setup, and HTTP listen.
 - `ConfigModule`: global environment configuration.
-- `PrismaModule`: provides the local read-only Prisma connection.
-- `PrismaService`: connects when local `DB_*` values are configured and reads the table count from `information_schema` at startup.
+- `PrismaModule`: provides the read-only legacy Prisma connection.
+- `PrismaService`: connects when `DB_*` values are configured and reads the table count from `information_schema` at startup.
 - `LegacyReadRepository`: reads the required customer, order, and fitting fields with explicit Prisma selects. Missing records return `null`.
 
 ## N-004 Legacy Reads
@@ -94,6 +94,7 @@ Implemented:
 - `HealthModule`
 - Swagger
 - Local MySQL 8 Compose setup and read-only database user initialization
+- Optional local NestJS container (`app` Compose profile); it uses the existing MySQL service over the Compose network
 - Prisma MySQL configuration and NestJS `PrismaModule` / `PrismaService`
 - Prisma models introspected from the imported local legacy dump
 - Startup read of local database table metadata when credentials are configured
@@ -105,7 +106,13 @@ Implemented:
 Not implemented:
 
 - PHP-side order-ready event call
-- NestJS containerization
+- Production server deployment and PHP-side network integration
+
+## N-010 Local Docker Boundary
+
+The `app` Compose profile packages NestJS for local verification. It uses `DB_HOST=mysql`, separate reader/writer credentials, and the already-provisioned local `notification_log`. It forces `FITTING_REMINDER_ENABLED=false` and omits the real Fonnte token. The image contains compiled JavaScript and the generated Prisma Client; secrets are injected at runtime. `/health` is HTTP liveness only, while both database connections are checked during startup.
+
+Production must run the NestJS container against the existing company MySQL over a private address. This repository's MySQL Compose service and root provisioning script are for local development. A DBA provisions `notification_log` and restricted grants separately; NestJS runtime does not migrate legacy tables. Limit `/docs` and the internal endpoint through network controls. Production server access, grants, PHP trigger wiring, and a controlled live Fonnte check remain unverified.
 
 ## N-008A Internal Order Ready Trigger
 
