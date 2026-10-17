@@ -1,153 +1,103 @@
 # WhatsApp Notification Service
 
-## Purpose
+## Tujuan
 
-This NestJS service is an addition to the existing PHP application. The existing database remains the source of truth, and NestJS does not replace PHP.
+Aplikasi PHP tetap menjadi aplikasi utama dan database MySQL legacy tetap menjadi sumber data. Service NestJS ini membaca data legacy untuk menentukan serta mengirim notifikasi WhatsApp melalui Fonnte. Tabel bisnis legacy hanya dibaca; `notification_log` adalah tabel milik NestJS yang dapat ditulis.
 
-## Current Scope
+## Arsitektur dan fitur
 
-N-002 provides the NestJS scaffold, configuration, health endpoint, and Swagger. N-003 adds a local MySQL 8 setup and Prisma for read-only access to an imported legacy database. N-004 adds repository queries for customer, order, category, and fitting records. N-005 adds `NotificationService` to prepare order-ready and fitting-reminder candidates or return SKIP reasons. N-006 adds `FonnteWhatsappService` as a transport for caller-provided phone and message. N-007 adds a NestJS-owned `notification_log` table, atomic claim, and idempotent delivery orchestration. The legacy Prisma models were introspected from the real dump; the dump and its data are not stored in this repository. N-008A adds the authenticated internal order-ready trigger. N-008B adds the automatic fitting reminder scheduler.
-
-## Requirements
-
-- Node.js (the NestJS 11 CLI requires Node.js 20 or newer)
-- npm
-- Docker with Compose for the local MySQL setup
-- A separate legacy SQL dump for database introspection
-
-## Installation
-
-```sh
-npm install
+```text
+PHP (trigger order-ready; wiring aktual belum terverifikasi) / scheduler fitting
+  → NestJS → MySQL legacy (SELECT saja)
+           → notification_log (klaim unik PENDING)
+           → Fonnte (provider menangani pengiriman WhatsApp)
+           → notification_log (status hasil request provider)
 ```
+
+Fitur yang tersedia: notifikasi order siap diambil, pengingat fitting, perlindungan duplikat, transport Fonnte, autentikasi API internal, dan pencatatan hasil. Detail modul dan batas data ada di [docs/architecture.md](docs/architecture.md).
+
+## Order ready
+
+Aplikasi PHP nantinya memanggil `POST /internal/notifications/order-ready` setelah order berubah menjadi tepat `order_status === "Selesai"`. Kirim **hanya** `orderId`:
+
+```http
+Authorization: Bearer <INTERNAL_API_KEY>
+Content-Type: application/json
+
+{"orderId":123}
+```
+
+NestJS membaca ulang order, customer, nomor HP, dan nama category dari database legacy; payload PHP bukan sumber data untuk field tersebut. Setelah data layak, service mengklaim key `ORDER_READY:<orderId>`, memanggil Fonnte satu kali, lalu mencatat hasil. Trigger duplikat tidak mengirim ulang. Order yang belum `Selesai` dikembalikan sebagai `SKIPPED` tanpa mengonsumsi key, sehingga order dapat diproses saat statusnya berubah. Nomor HP yang hilang pada order siap dicatat `SKIPPED` dan tidak dikirim.
+
+Respons bisnis memakai HTTP 200 dengan `outcome` `SENT`, `DUPLICATE`, `SKIPPED`, `FAILED`, atau `AMBIGUOUS`; `SKIPPED` juga membawa `reason`. Body invalid menghasilkan 400, Bearer key hilang/salah 401, key server belum dikonfigurasi 503, dan error internal tak terduga 500. Integrasi pemanggilan dari kode PHP belum ada/terverifikasi dalam repository ini.
+
+## Fitting reminder
+
+Scheduler memakai kalender `Asia/Jakarta` dan hanya memproses fitting dengan `tbl_order.tgl_coba` sama dengan hari ini serta `tbl_fitting.fitting_status IS NULL`. Ia membaca nama category dari database. Jadwal cron berjalan tiap 30 menit mulai 11:00 sampai 20:30; startup/restart juga dapat mengejar fitting **hari ini** dalam window tersebut. Menit 20:30 masih boleh, mulai 20:31 tidak boleh. Fitting kemarin tidak dikejar.
+
+Scan berjalan hanya jika `FITTING_REMINDER_ENABLED` bernilai persis `"true"`. Nilai lain atau env yang tidak ada berarti **disabled**, termasuk saat startup. Key `FITTING:<fittingId>` memastikan satu notifikasi per fitting. Nomor HP hilang dicatat `SKIPPED` tanpa memanggil Fonnte. Tidak ada pengiriman ulang otomatis untuk hasil gagal atau tidak pasti.
+
+## Status notifikasi
+
+| Status | Arti |
+|---|---|
+| `PENDING` | Key berhasil diklaim; hasil pengiriman belum tersimpan. |
+| `SENT` | Fonnte secara eksplisit menerima request; **bukan** bukti pesan telah diterima di WhatsApp. |
+| `FAILED` | Fonnte secara eksplisit menolak request. |
+| `SKIPPED` | Nomor HP hilang pada kandidat yang layak; alasan disimpan. SKIP lain tidak selalu dicatat. |
+| `AMBIGUOUS` | Hasil request tidak pasti, misalnya timeout atau respons tidak terkonfirmasi. |
+
+Unique key pada `notification_log` mencegah pengiriman kedua untuk identitas yang sudah tercatat, apa pun statusnya. Tidak ada blind retry; `PENDING` atau `AMBIGUOUS` memerlukan pemeriksaan manual sebelum keputusan mengirim lagi.
 
 ## Environment
 
-Copy `.env.example` to `.env` and set values as needed:
+Salin [.env.example](.env.example) menjadi `.env`, lalu isi sesuai lingkungan lokal. Jangan commit `.env` atau mencetak credential. Variabel yang dipakai:
+
+| Nama | Kegunaan |
+|---|---|
+| `PORT` | Port HTTP NestJS. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME` | Lokasi dan nama database legacy lokal. |
+| `DB_USER`, `DB_PASSWORD` | Akun pembaca legacy dengan hak SELECT saja. |
+| `NOTIFICATION_DB_USER`, `NOTIFICATION_DB_PASSWORD` | Akun writer yang dibatasi ke `notification_log`. |
+| `FONNTE_TOKEN` | Token device Fonnte untuk transport WhatsApp. |
+| `INTERNAL_API_KEY` | Bearer key untuk endpoint order-ready internal. |
+| `FITTING_REMINDER_ENABLED` | Switch scan fitting; hanya string persis `"true"` yang mengaktifkan. |
+
+Untuk MySQL lokal, `.env.docker.example` menyediakan `DB_ROOT_PASSWORD` bagi provisioning; simpan di `.env.docker`, bukan `.env` NestJS. Langkah database dan Prisma ada di [docs/local-database.md](docs/local-database.md).
+
+## Menjalankan lokal
+
+Butuh Node.js 20+, npm, dan MySQL lokal yang telah disiapkan sesuai dokumentasi database.
 
 ```sh
-cp .env.example .env
-```
-
-`PORT` selects the HTTP port and defaults to `3000`. `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configure the local read-only MySQL connection. `NOTIFICATION_DB_USER` and `NOTIFICATION_DB_PASSWORD` configure a separate account with rights only on `notification_log`. The N-003 connection accepts only loopback hosts (`127.0.0.1`, `localhost`, or `::1`) to avoid reaching a remote database. `FONNTE_TOKEN` is required when calling `FonnteWhatsappService.send`; `INTERNAL_API_KEY` authenticates the internal order-ready endpoint. Keep tokens out of logs and version control.
-
-For Docker, also copy `.env.docker.example` to `.env.docker` and set `DB_ROOT_PASSWORD` there. Keep the root password out of the NestJS `.env` file. Both local environment files are ignored by Git.
-
-The full MySQL startup, dump import, and Prisma commands are in [docs/local-database.md](docs/local-database.md).
-
-## Run Development
-
-```sh
+npm install
 npm run start:dev
 ```
 
-## Build
-
-```sh
-npm run build
-```
+Build dan jalankan hasil build dengan `npm run build` lalu `npm run start:prod`. Pastikan scheduler tetap disabled di lokal kecuali memang sedang melakukan pengujian terkontrol dengan provider mock.
 
 ## Test
 
-Jest runs TypeScript `*.spec.ts` files placed under `src/` through `ts-jest`, without building `dist/` first. The N-005 business rules are covered by `src/notification/services/notification.service.spec.ts` with a mocked repository.
-
 ```sh
-npm test
-npm run test:watch
-npm run test:cov
+npm run check-all
 ```
 
-The existing N-004 CommonJS tests remain unchanged and are excluded from Jest. Run them separately with `npm run test:legacy`; that command still builds `dist/` first. These tests mock Prisma and do not connect to or modify the legacy database.
+Perintah itu menjalankan Jest, test legacy CommonJS, integration test MySQL, lint, build, dan pemeriksaan diff/status. Integration test memerlukan database lokal serta akun notification writer; test membuat dan membersihkan hanya row sintetis di `notification_log`.
 
-With local read-only MySQL configured in `.env`, run `npm run test:smoke` to check the repository against real customer, order, fitting, and category records. The smoke test performs only SELECT queries and prints no customer data.
+Perintah terpisah: `npm test` untuk unit/flow Jest, `npm run test:legacy` untuk repository test lama, dan `npm run test:notification-log:integration` untuk klaim unik dan persistensi MySQL. Fonnte **di-mock** pada semua automated test tersebut. `npm run test:smoke` adalah pemeriksaan READ-ONLY repository terhadap MySQL lokal; tidak mengirim WhatsApp.
 
-After provisioning `notification_log`, run `npm run test:notification-log:integration` for the MySQL UNIQUE and concurrent delivery checks. Its Fonnte dependency is mocked, so it cannot send WhatsApp. See [docs/local-database.md](docs/local-database.md) for provisioning and cleanup details.
+Live Fonnte smoke test berbeda dari automated test: jalankan secara manual dan eksplisit ke nomor milik developer, maksimal satu send, tanpa retry otomatis jika hasilnya tidak pasti. Jangan gunakan nomor customer legacy.
 
-## Production Start
+## Dokumentasi API dan keamanan demo
 
-```sh
-npm run start:prod
-```
+Saat service berjalan, buka `http://localhost:<PORT>/docs`. Swagger menjelaskan `/health` dan endpoint order-ready internal. Endpoint order-ready memakai `Authorization: Bearer <INTERNAL_API_KEY>`; Swagger bukan sistem login/JWT.
 
-## Health Check
+- Jangan menulis data bisnis legacy; aksesnya READ-ONLY.
+- Jangan menjalankan live Fonnte test dengan data customer.
+- Jangan menjalankan `docker compose down -v` kecuali memang ingin menghancurkan database lokal.
+- Jangan commit `.env` atau credential lain.
+- Akses production ke `/docs` dan endpoint internal perlu dibatasi oleh jaringan/deployment saat N-010.
 
-`GET /health` returns HTTP 200:
+## Batas implementasi saat ini
 
-```json
-{"status":"ok"}
-```
-
-## Swagger
-
-Open `/docs` while the application is running.
-
-## Architecture
-
-Planned flow:
-
-```text
-PHP Application / Scheduler
-        ↓
-NestJS Notification Service
-        ↓
-Existing Database
-        ↓
-Fonnte
-        ↓
-WhatsApp Customer
-```
-
-N-005 prepares notification candidates, N-006 provides the Fonnte transport, and N-007 provides idempotent delivery for a READY candidate plus caller-provided message. N-008A invokes delivery for an authenticated order-ready trigger. N-008B invokes delivery for eligible fittings from the daily scheduler. See [docs/architecture.md](docs/architecture.md) for the runtime flow and module responsibilities.
-
-## Scope Boundaries
-
-This MVP does not require a frontend, dashboard, Redis, BullMQ, Kafka, RabbitMQ, new user authentication, analytics, or additional microservices.
-
-## Internal Order Ready Trigger (N-008A)
-
-PHP dapat memanggil `POST /internal/notifications/order-ready` dengan header
-`Authorization: Bearer <INTERNAL_API_KEY>` dan body JSON `{"orderId":123}`.
-Hanya satu field `orderId` yang diterima: bilangan bulat positif yang aman.
-Jangan kirim status, customer, nomor telepon, category, atau pesan dari PHP.
-
-NestJS membaca ulang order, customer, dan category dari legacy DB. Order hanya
-READY jika `order_status` tepat `Selesai`. Respons bisnis menggunakan HTTP 200
-dengan `outcome`: `SENT`, `DUPLICATE`, `SKIPPED`, `FAILED`, atau `AMBIGUOUS`.
-`SKIPPED` menyertakan `reason` yang aman. `SENT` berarti Fonnte menerima
-pesan untuk diproses, bukan konfirmasi pesan sudah sampai di WhatsApp.
-Input invalid mendapat 400, auth invalid 401, konfigurasi key kosong 503,
-dan kegagalan internal tak terduga mendapat 500 tanpa detail database.
-
-`ORDER_NOT_READY` dan SKIP sementara lain tidak mengonsumsi key.
-`PHONE_MISSING` untuk order yang sudah `Selesai` dicatat sebagai
-`SKIPPED` dengan key `ORDER_READY:<orderId>`. Key unik pada
-`notification_log` mencegah pengiriman ulang, termasuk saat request bersamaan.
-PHP tidak boleh melakukan blind retry untuk respons `FAILED` atau
-`AMBIGUOUS`. Endpoint tidak mengubah tabel bisnis legacy.
-
-## Fitting Reminder Scheduler (N-008B)
-
-Scheduler hanya scan jika `FITTING_REMINDER_ENABLED=true` persis. Nilai `false`,
-nilai lain, atau env yang tidak ada menonaktifkan scan, termasuk saat startup.
-Set `FITTING_REMINDER_ENABLED=true` secara eksplisit di production setelah siap
-mengirim reminder sungguhan.
-
-Saat diaktifkan, scheduler scan saat startup dan setiap 30 menit mulai 11:00
-sampai 20:30 Asia/Jakarta. Menit 20:30 masih termasuk window; mulai 20:31
-tidak ada scan atau pengiriman baru. Restart dalam window langsung memproses
-fitting hari itu tanpa menunggu cron berikutnya. Automated test memakai mock Fonnte.
-
-Eligible hanya `tbl_order.tgl_coba = hari Jakarta hari ini` dan
-`tbl_fitting.fitting_status IS NULL`. String kosong bukan NULL, dan fitting kemarin
-atau besok tidak dikirim. Preparation membaca ulang fitting/order, memeriksa
-tanggal dan status, lalu mengambil customer dan category dari database.
-
-Pesan: `Halo Pak/Bu {customerName}, hari ini ada fitting {categoryName}. Toko buka jam 11.00 - 20.30. Terima kasih.`
-`Pak/Bu` literal; nama pakaian mengikuti category DB. Jam 20.30 juga menjadi
-batas akhir menit pemrosesan pada hari fitting yang sama.
-
-Nomor HP null/kosong/whitespace mengikuti rule existing dan dicatat `SKIPPED`
-dengan key `FITTING:<fittingId>`. SKIP lain tidak mengonsumsi key. Delivery memakai
-atomic claim N-007; existing PENDING/SENT/FAILED/SKIPPED/AMBIGUOUS memblokir send
-berikutnya, termasuk setelah nomor diperbaiki atau tanggal fitting berubah.
-Tidak ada retry Fonnte otomatis. Tabel legacy tetap SELECT-only.
+Sisi endpoint NestJS telah diuji, tetapi wiring pemanggilan **PHP → NestJS** belum terverifikasi. Live Fonnte smoke test tetap manual. Docker/deployment production dan verifikasi environment production termasuk pekerjaan berikutnya, bukan bagian dari fitur yang sudah terbukti di repository ini.

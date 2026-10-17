@@ -4,7 +4,7 @@
 
 The existing PHP application remains the primary application. Its database remains the source of truth. NestJS is an additional service for WhatsApp notifications and does not replace PHP.
 
-## Planned Runtime Flow
+## Runtime Flow
 
 Fitting:
 
@@ -12,8 +12,9 @@ Fitting:
 Scheduler
 → Legacy DB
 → NotificationService
-→ Fonnte
-→ WhatsApp Customer
+→ NotificationDeliveryService / notification_log claim
+→ Fonnte (provider handles WhatsApp delivery)
+→ notification_log final status (provider request outcome)
 ```
 
 Order ready preferred:
@@ -23,8 +24,9 @@ PHP Event
 → NestJS
 → Legacy DB
 → NotificationService
-→ Fonnte
-→ WhatsApp Customer
+→ NotificationDeliveryService / notification_log claim
+→ Fonnte (provider handles WhatsApp delivery)
+→ notification_log final status (provider request outcome)
 ```
 
 N-008A implements the authenticated NestJS order-ready endpoint. N-008B implements fitting reminder scheduling. PHP-side event integration remains future work.
@@ -127,7 +129,7 @@ pada tabel bisnis legacy.
 `ScheduleModule.forRoot()` didaftarkan sekali di `AppModule`.
 `FittingReminderScheduler` hanya scan jika `FITTING_REMINDER_ENABLED` bernilai
 persis `true`; env tidak ada atau nilai lain membuatnya disabled. Saat enabled,
-scan berjalan pada application bootstrap dan cron `0 */30 11-20 * * *` dengan
+scan berjalan pada application bootstrap dan cron `0 0,30 11-20 * * *` dengan
 `timeZone: Asia/Jakarta`. Window inklusif menit 11:00-20:30; mulai 20:31
 tidak scan. Sebelum klaim kandidat, scheduler memeriksa ulang tanggal, waktu,
 dan switch. Flag lokal mencegah
@@ -135,7 +137,7 @@ overlap scan pada satu instance; UNIQUE `notification_log` tetap menjadi
 pengaman final untuk beberapa instance.
 
 `Intl.DateTimeFormat` dengan timezone Jakarta menentukan tahun, bulan, hari,
-dan jam sekarang. Hari tersebut diwakili sebagai UTC midnight untuk kolom
+jam, dan menit sekarang. Hari tersebut diwakili sebagai UTC midnight untuk kolom
 Prisma `DateTime @db.Date`; ini nilai kalender, bukan waktu event UTC.
 Repository memilih ID order dengan `tgl_coba` tepat tanggal tersebut lalu
 ID fitting dengan `order_id` terkait dan `fitting_status: null`. Ketiadaan

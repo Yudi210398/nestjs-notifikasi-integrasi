@@ -154,6 +154,38 @@ describe("NotificationLog MySQL integration", () => {
     expect(log?.status).toBe("SENT");
   });
 
+  it("penolakan provider tersimpan sebagai FAILED tanpa send ulang", async () => {
+    const key = identity();
+    const fonnte = {
+      send: jest.fn().mockResolvedValue({
+        outcome: "DEFINITE_FAILURE",
+        reason: "PROVIDER_REJECTED",
+      }),
+    } as unknown as FonnteWhatsappService;
+    const service = new NotificationDeliveryService(repository, fonnte);
+
+    try {
+      await expect(
+        service.deliver(candidate(key.sourceId), "synthetic message"),
+      ).resolves.toEqual({ outcome: "DEFINITE_FAILURE" });
+      await expect(
+        service.deliver(candidate(key.sourceId), "synthetic message"),
+      ).resolves.toEqual({ outcome: "DUPLICATE" });
+
+      expect(fonnte.send).toHaveBeenCalledTimes(1);
+      await expect(
+        writer.notificationLog.findUnique({
+          where: { notificationKey: key.notificationKey },
+          select: { status: true, reason: true },
+        }),
+      ).resolves.toEqual({ status: "FAILED", reason: "PROVIDER_REJECTED" });
+    } finally {
+      await writer.notificationLog.deleteMany({
+        where: { notificationKey: key.notificationKey },
+      });
+    }
+  });
+
   it.each(["PENDING", "SENT", "FAILED", "AMBIGUOUS", "SKIPPED"])(
     "existing %s tetap memblokir send",
     async (status) => {
